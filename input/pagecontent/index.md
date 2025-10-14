@@ -1,3 +1,3 @@
-# dk-ehmi-eer-testscripts
+# EER TestScripts
 
-Feel free to modify this index page with your own awesome content!
+TODO
