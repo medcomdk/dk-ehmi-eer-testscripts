@@ -38,10 +38,10 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
 * test[0]
   * id = "CreateNewOrganization"
   * name = "CreateNewOrganization"
-  * description = "Create a new EERMessagingOrganization in JSON format."
+  * description = "Create a new EERMessagingOrganization."
   * action[0].operation
     * type = $testscript-operation-codes#create
-    * description = "Organization create operation with HTTP Header Accept and Content-Type set to JSON format."
+    * description = "Organization create operation."
     * contentType = #{xmlOrJson}
     * accept = #{xmlOrJson}
     * destination = 1
@@ -63,10 +63,10 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
 * test[+]
   * id = "UpdateOrganization"
   * name = "UpdateOrganization"
-  * description = "Update an existing EERMessagingOrganization in JSON format."
+  * description = "Update an existing EERMessagingOrganization."
   * action[0].operation
     * type = $testscript-operation-codes#update
-    * description = "Organization update operation with json content."
+    * description = "Organization update operation."
     * contentType = #{xmlOrJson}
     * accept = #{xmlOrJson}
     * destination = 1
@@ -83,7 +83,7 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
 * test[+]
   * id = "DeleteOrganization"
   * name = "DeleteOrganization"
-  * description = "Delete an existing EERMessagingOrganization in JSON format."
+  * description = "Delete an existing EERMessagingOrganization."
   * action[0].operation
     * type = $testscript-operation-codes#delete
     * description = "Organization delete operation."
