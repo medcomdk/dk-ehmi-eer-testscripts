@@ -6,49 +6,23 @@ import re
 import shutil
 import subprocess
 import sys
+import json
 from pathlib import Path
-
-# D = Dollarsign. CS = Curly bracket Start. CX = Touchstone Placeholder CX. CE = Curly bracket End.
-REPLACEMENTS = {
-    "D-CS-C1-CE": "${C1}",
-    "D-CS-C2-CE": "${C2}",
-    "D-CS-C3-CE": "${C3}",
-    "D-CS-C4-CE": "${C4}",
-    "D-CS-C5-CE": "${C5}",
-    "D-CS-C6-CE": "${C6}",
-    "D-CS-C7-CE": "${C7}",
-    "D-CS-C8-CE": "${C8}",
-    "D-CS-C9-CE": "${C9}",
-    "D-CS-C10-CE": "${C10}",
-    "D-CS-C11-CE": "${C11}",
-    "D-CS-C12-CE": "${C12}",
-    "D-CS-C13-CE": "${C13}",
-    "D-CS-C14-CE": "${C14}",
-    "D-CS-C15-CE": "${C15}",
-    "D-CS-C16-CE": "${C16}",
-    "D-CS-C17-CE": "${C17}",
-    "D-CS-C18-CE": "${C18}",
-    "D-CS-C19-CE": "${C19}",
-    "D-CS-C20-CE": "${C20}",
-    "1970-01-01T00:00:00.000+02:00": "${CURRENTDATETIME}",
-}
+from collections import Counter, defaultdict
 
 DEFAULT_GENERATED_ROOT = Path("fsh-generated") / "resources"
 DEFAULT_TARGET_STR = r"C:\Users\OLW\workspace-ts-ide\FHIRSandbox\EHMIEndpointRegistry"
 
+# Match "TouchstoneHelper-DS-CBS-<WILDCARD>-CBE" and capture <WILDCARD>
+_WILDCARD_RX = re.compile(r"TouchstoneHelper-DS-CBS-([A-Za-z][A-Za-z0-9_]*)-CBE")
+
+# For filenames: allow letters, digits, dash, underscore, dot. Replace others with underscore.
+_SANITIZE_NAME_RX = re.compile(r"[^A-Za-z0-9._-]+")
 
 def resolve_target_path(target_str: str) -> Path:
-    """
-    Return a usable absolute Path for the target directory.
-    - On Windows, 'C:\\...' is already absolute.
-    - On POSIX (macOS/Linux), if a Windows-style path is provided, try a WSL mapping:
-      'C:\\Users\\...' -> '/mnt/c/Users/...'. If that doesn't exist, error out.
-    """
-    # If we're on Windows, just use it
     if os.name == "nt":
         return Path(target_str).absolute()
 
-    # POSIX: detect Windows-style path like 'C:\...' or 'C:/...'
     m = re.match(r"^([A-Za-z]):[\\/](.*)$", target_str)
     if m:
         drive, rest = m.groups()
@@ -63,10 +37,7 @@ def resolve_target_path(target_str: str) -> Path:
             sys.exit(1)
         return wsl_path.resolve()
 
-    # Otherwise, treat as normal POSIX path
-    p = Path(target_str)
-    # Make it absolute relative to cwd
-    return p.resolve()
+    return Path(target_str).resolve()
 
 
 def run_sushi(skip: bool, dry_run: bool) -> None:
@@ -96,35 +67,163 @@ def run_sushi(skip: bool, dry_run: bool) -> None:
         sys.exit(e.returncode or 1)
 
 
-def process_file(fp: Path, dry_run: bool, backup: bool) -> dict[str, int] | None:
+def transform_wildcards(text: str) -> tuple[str, list[tuple[str, str]]]:
+    """
+    Replace every 'TouchstoneHelper-DS-CBS-<WILDCARD>-CBE' with '${<WILDCARD>}'.
+    Returns (updated_text, list_of_(from,to)_pairs_per_occurrence).
+    """
+    pairs: list[tuple[str, str]] = []
+
+    def _repl(m: re.Match) -> str:
+        wildcard = m.group(1)
+        old = m.group(0)
+        new = f"${{{wildcard}}}"
+        pairs.append((old, new))
+        return new
+
+    updated = _WILDCARD_RX.sub(_repl, text)
+    return updated, pairs
+
+
+def _extract_filename_override(parsed_json: dict) -> str | None:
+    """
+    Find meta.tag entry with id == 'TouchstoneHelperFileNameOverride' and return its display.
+    """
+    try:
+        tags = parsed_json.get("meta", {}).get("tag", [])
+        if isinstance(tags, list):
+            for tag in tags:
+                if isinstance(tag, dict) and tag.get("id") == "TouchstoneHelperFileNameOverride":
+                    disp = tag.get("display")
+                    if isinstance(disp, str) and disp.strip():
+                        return disp.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _remove_filename_override_tag(parsed_json: dict) -> bool:
+    """
+    Remove the meta.tag object(s) where id == 'TouchstoneHelperFileNameOverride'.
+    Returns True if any removal occurred.
+    """
+    meta = parsed_json.get("meta")
+    if not isinstance(meta, dict):
+        return False
+
+    tags = meta.get("tag")
+    if not isinstance(tags, list):
+        return False
+
+    new_tags = [
+        t for t in tags
+        if not (isinstance(t, dict) and t.get("id") == "TouchstoneHelperFileNameOverride")
+    ]
+
+    if new_tags == tags:
+        return False
+
+    if new_tags:
+        meta["tag"] = new_tags
+    else:
+        # If the tag array is now empty, drop it entirely
+        try:
+            del meta["tag"]
+        except Exception:
+            pass
+        # If meta becomes empty, you could optionally remove meta too.
+        if not meta:
+            try:
+                del parsed_json["meta"]
+            except Exception:
+                pass
+
+    return True
+
+
+def _sanitize_filename(stem: str) -> str:
+    clean = _SANITIZE_NAME_RX.sub("_", stem).strip("._-")
+    return clean or "renamed"
+
+
+def process_file(fp: Path, dry_run: bool, backup: bool) -> dict | None:
+    """
+    Returns:
+      {
+        "pairs": list[(old,new)],
+        "renamed_from": str | None,
+        "renamed_to": str | None,
+        "removed_override_tag": bool
+      }
+    """
     try:
         text = fp.read_text(encoding="utf-8")
     except Exception as e:
         print(f"⚠️  Skipping {fp} (read error: {e})")
         return None
 
-    counts: dict[str, int] = {}
-    updated = text
-    for old, new in REPLACEMENTS.items():
-        c = updated.count(old)
-        if c:
-            counts[old] = c
-            updated = updated.replace(old, new)
+    # Do wildcard replacements
+    updated_text, pairs = transform_wildcards(text)
 
-    if not counts:
-        return {}
+    # Try to parse JSON (after replacement is fine, the value types are still strings)
+    rename_from = None
+    rename_to = None
+    removed_override_tag = False
+    try:
+        parsed = json.loads(updated_text)
 
-    if not dry_run:
-        try:
-            if backup:
-                bak = fp.with_suffix(fp.suffix + ".bak")
-                bak.write_text(text, encoding="utf-8")
-            fp.write_text(updated, encoding="utf-8")
-        except Exception as e:
-            print(f"❌ Failed to write {fp}: {e}")
-            return None
+        # 1) Decide on rename BEFORE removing the tag
+        override = _extract_filename_override(parsed)
+        if override:
+            sanitized = _sanitize_filename(override)
+            # Preserve original extension
+            new_name = f"{sanitized}{fp.suffix or '.json'}"
+            if fp.name != new_name:
+                rename_from = fp.name
+                rename_to = new_name
 
-    return counts
+        # 2) Remove the override tag from the JSON
+        removed_override_tag = _remove_filename_override_tag(parsed)
+        if removed_override_tag:
+            # Re-serialize with pretty formatting
+            updated_text = json.dumps(parsed, ensure_ascii=False, indent=2)
+            if not updated_text.endswith("\n"):
+                updated_text += "\n"
+
+    except Exception:
+        # If parsing fails, we still proceed with text replacements,
+        # but cannot rename by meta tag or remove it.
+        pass
+
+    # Only write if there are changes (content or rename)
+    content_changed = (updated_text != text)
+    if content_changed or rename_to:
+        if not dry_run:
+            try:
+                if backup and content_changed:
+                    bak = fp.with_suffix(fp.suffix + ".bak")
+                    bak.write_text(text, encoding="utf-8")
+                # Write updated content if changed
+                if content_changed:
+                    fp.write_text(updated_text, encoding="utf-8")
+                # Perform rename if needed
+                if rename_to:
+                    target = fp.with_name(rename_to)
+                    # If destination exists, overwrite it for determinism
+                    if target.exists():
+                        target.unlink()
+                    fp.rename(target)
+                    fp = target  # update fp so later steps would see the new name if returned
+            except Exception as e:
+                print(f"❌ Failed to update/rename {fp}: {e}")
+                return None
+
+    return {
+        "pairs": pairs,
+        "renamed_from": rename_from,
+        "renamed_to": rename_to,
+        "removed_override_tag": removed_override_tag,
+    }
 
 
 def bulk_replace(root: Path, recursive: bool, dry_run: bool, backup: bool) -> int:
@@ -136,30 +235,60 @@ def bulk_replace(root: Path, recursive: bool, dry_run: bool, backup: bool) -> in
     files = (root.glob(pattern) if not recursive else root.rglob(pattern))
 
     total_files_changed = 0
-    total_counts = {k: 0 for k in REPLACEMENTS.keys()}
+    overall_counter: Counter[tuple[str, str]] = Counter()
+    renames_overall: list[tuple[str, str, str]] = []  # (dir, old, new)
 
     for fp in files:
         result = process_file(fp, dry_run=dry_run, backup=backup)
         if result is None:
             continue
-        if result:
+        pairs = result["pairs"]
+        rename_from = result["renamed_from"]
+        rename_to = result["renamed_to"]
+        removed_override_tag = result.get("removed_override_tag", False)
+
+        if pairs or rename_to or removed_override_tag:
             total_files_changed += 1
-            pretty = ", ".join([f"{k}×{v}" for k, v in result.items()])
-            print(f"✅ {fp}: {pretty}")
-            for k, v in result.items():
-                total_counts[k] += v
+
+            # Per-file aggregation (unique pair -> count)
+            file_counter = Counter(pairs)
+            overall_counter.update(file_counter)
+
+            print(f"✅ {fp.parent / (rename_to or fp.name)}:")
+            for (old, new), cnt in file_counter.items():
+                print(f"   • {old} → {new}  ×{cnt}")
+            if rename_to:
+                renames_overall.append((str(fp.parent), rename_from, rename_to))
+                print(f"   • Rename: {rename_from} → {rename_to}")
+            if removed_override_tag:
+                print("   • Removed meta.tag 'TouchstoneHelperFileNameOverride'")
 
     if total_files_changed == 0:
-        print("ℹ️  No replacements needed.")
+        print("ℹ️  No replacements or renames needed.")
     else:
-        print("\n— Replacement Summary —")
-        for k, v in total_counts.items():
-            print(f"{k} → {REPLACEMENTS[k]} : {v} replacement(s)")
+        print("\n— Replacement Summary (overall) —")
+        total_repls = 0
+        by_to: dict[str, Counter[str]] = defaultdict(Counter)
+        for (old, new), cnt in overall_counter.items():
+            by_to[new][old] += cnt
+            total_repls += cnt
+
+        for new, olds_counter in by_to.items():
+            for old, cnt in olds_counter.items():
+                print(f"{old} → {new} : {cnt} replacement(s)")
+
+        print(f"Total replacements: {total_repls}")
+
+        if renames_overall:
+            print("\n— Rename Summary —")
+            for d, old, new in renames_overall:
+                print(f"{d}{os.sep}{old} → {new}")
+
         print(f"Files changed: {total_files_changed}")
         if dry_run:
-            print("Dry run only — no files were written.")
+            print("Dry run only — no files were written or renamed.")
         else:
-            print("Backups saved with .bak suffix." if backup else "")
+            print("Backups saved with .bak suffix for content edits." if backup else "")
 
     return total_files_changed
 
@@ -234,7 +363,7 @@ def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
 
 def main():
     p = argparse.ArgumentParser(
-        description="Run sushi, apply replacements, organize Fixtures, and move resources."
+        description="Run sushi, apply wildcard replacements, rename by TouchstoneHelperFileNameOverride, remove its meta.tag entry, organize Fixtures, and move resources."
     )
     p.add_argument(
         "--resources",
@@ -257,14 +386,12 @@ def main():
     p.add_argument("--skip-sushi", action="store_true", help="Do not run `sushi .` first.")
     args = p.parse_args()
 
-    # 1) Run sushi
     run_sushi(skip=args.skip_sushi, dry_run=args.dry_run)
 
     resources_dir = Path(args.resources).resolve()
     target_dir = resolve_target_path(args.target)
 
-    # 2) Apply replacements to JSON under fsh-generated/resources
-    print(f"🛠️  Applying replacements in: {resources_dir}")
+    print(f"🛠️  Applying replacements & filename overrides in: {resources_dir}")
     rep_status = bulk_replace(
         root=resources_dir,
         recursive=not args.non_recursive,
@@ -274,11 +401,9 @@ def main():
     if rep_status == -1:
         sys.exit(1)
 
-    # 3) Move *Fixture.json into .../Fixtures
     print("🗂️  Organizing Fixture JSONs...")
     move_fixture_jsons(resources_dir, dry_run=args.dry_run)
 
-    # 4) Move/Merge everything from resources into target, overwriting
     print(f"🚚 Moving generated resources to target (overwrite): {target_dir}")
     merge_move(resources_dir, target_dir, dry_run=args.dry_run)
 
