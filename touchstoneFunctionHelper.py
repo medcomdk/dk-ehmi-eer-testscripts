@@ -9,6 +9,10 @@ import sys
 import json
 from pathlib import Path
 from collections import Counter, defaultdict
+from typing import Any, Union
+
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 DEFAULT_GENERATED_ROOT = Path("fsh-generated") / "resources"
 DEFAULT_TARGET_STR = r"C:\Users\OLW\workspace-ts-ide\FHIRSandbox\EHMIEndpointRegistry"
@@ -18,6 +22,12 @@ _WILDCARD_RX = re.compile(r"TouchstoneHelper-DS-CBS-([A-Za-z][A-Za-z0-9_]*)-CBE"
 
 # For filenames: allow letters, digits, dash, underscore, dot. Replace others with underscore.
 _SANITIZE_NAME_RX = re.compile(r"[^A-Za-z0-9._-]+")
+
+# FHIR XML namespaces
+FHIR_NS = "http://hl7.org/fhir"
+XHTML_NS = "http://www.w3.org/1999/xhtml"
+ET.register_namespace("", FHIR_NS)
+ET.register_namespace("xhtml", XHTML_NS)
 
 def resolve_target_path(target_str: str) -> Path:
     if os.name == "nt":
@@ -360,10 +370,119 @@ def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
         else:
             print(f"⚠️  Skipping non-file: {item}")
 
+# ---------------------------
+# FHIR JSON → XML conversion
+# ---------------------------
+
+_PRIMITIVE_TYPES = {
+    "base64Binary","boolean","canonical","code","date","dateTime","decimal","id","instant",
+    "integer","markdown","oid","positiveInt","string","time","unsignedInt","uri","url","uuid"
+}
+
+def _is_primitive_element(name: str, value: Any) -> bool:
+    # Heuristic: FHIR primitive elements are leaf values (str/int/float/bool or {"value":...})
+    return isinstance(value, (str, int, float, bool)) or (isinstance(value, dict) and "value" in value)
+
+def _set_primitive(el: ET.Element, value: Any) -> None:
+    # In FHIR XML, primitive value goes in @value
+    if isinstance(value, dict) and "value" in value and len(value) == 1:
+        val = value["value"]
+    else:
+        val = value
+    el.set("value", str(val))
+
+def _append_child(parent: ET.Element, name: str) -> ET.Element:
+    return ET.SubElement(parent, f"{{{FHIR_NS}}}{name}")
+
+def _serialize_element(parent: ET.Element, name: str, value: Any) -> None:
+    # Arrays -> repeated elements
+    if isinstance(value, list):
+        for item in value:
+            _serialize_element(parent, name, item)
+        return
+
+    el = _append_child(parent, name)
+
+    # Primitive leaf?
+    if _is_primitive_element(name, value):
+        _set_primitive(el, value if not isinstance(value, dict) else value.get("value"))
+        return
+
+    # Complex object
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if v is None:
+                continue
+            # Special case: Narrative.text.div is XHTML that should be embedded as XML, not string
+            if name == "text" and k == "div" and isinstance(v, str) and v.strip().startswith("<"):
+                try:
+                    # Parse XHTML fragment and graft with xhtml ns
+                    div_el = ET.fromstring(v)
+                    # Ensure namespace is XHTML
+                    if not div_el.tag.startswith("{"):
+                        div_el.tag = f"{{{XHTML_NS}}}{div_el.tag}"
+                    el.append(div_el)
+                except Exception:
+                    # If parsing fails, fall back to a literal child with value attr
+                    div = _append_child(el, "div")
+                    div.set("value", v)
+                continue
+            _serialize_element(el, k, v)
+        return
+
+    # Otherwise (shouldn't happen often), coerce to primitive
+    _set_primitive(el, value)
+
+def json_resource_to_xml_tree(obj: dict) -> ET.ElementTree:
+    if not isinstance(obj, dict) or "resourceType" not in obj:
+        raise ValueError("Not a valid FHIR resource JSON: missing 'resourceType'")
+    root_name = obj["resourceType"]
+    root = ET.Element(f"{{{FHIR_NS}}}{root_name}")
+    for key, val in obj.items():
+        if key == "resourceType" or val is None:
+            continue
+        _serialize_element(root, key, val)
+    return ET.ElementTree(root)
+
+def write_pretty_xml(tree: ET.ElementTree, out_path: Path) -> None:
+    rough = ET.tostring(tree.getroot(), encoding="utf-8", xml_declaration=True)
+    # Pretty print without changing content
+    parsed = minidom.parseString(rough)
+    with out_path.open("wb") as f:
+        f.write(parsed.toprettyxml(indent="  ", encoding="utf-8"))
+
+def convert_fixtures_to_xml(fixtures_dir: Path, dry_run: bool) -> int:
+    """
+    For each *.json in fixtures_dir, write a sibling *.xml with equivalent FHIR XML.
+    Returns count of XML files written.
+    """
+    if not fixtures_dir.exists():
+        print(f"ℹ️  Fixtures directory not found (skipping XML conversion): {fixtures_dir}")
+        return 0
+
+    written = 0
+    for jf in sorted(fixtures_dir.glob("*.json")):
+        xf = jf.with_suffix(".xml")
+        if dry_run:
+            print(f"🧪 Would convert fixture to XML: {jf.name} -> {xf.name}")
+            written += 1
+            continue
+
+        try:
+            data = json.loads(jf.read_text(encoding="utf-8"))
+            tree = json_resource_to_xml_tree(data)
+            write_pretty_xml(tree, xf)
+            print(f"🗜️  Converted to XML: {jf.name} -> {xf.name}")
+            written += 1
+        except Exception as e:
+            print(f"❌ Failed to convert {jf.name} to XML: {e}")
+
+    print(f"🧾 XML files created: {written}" + (" (dry-run)" if dry_run else ""))
+    return written
 
 def main():
     p = argparse.ArgumentParser(
-        description="Run sushi, apply wildcard replacements, rename by TouchstoneHelperFileNameOverride, remove its meta.tag entry, organize Fixtures, and move resources."
+        description="Run sushi, apply wildcard replacements, rename by TouchstoneHelperFileNameOverride, remove its meta.tag entry, organize Fixtures, move resources, and convert Fixtures to XML."
     )
     p.add_argument(
         "--resources",
@@ -384,6 +503,7 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Show actions, do not modify files.")
     p.add_argument("--backup", action="store_true", help="Save a .bak copy before writing.")
     p.add_argument("--skip-sushi", action="store_true", help="Do not run `sushi .` first.")
+    p.add_argument("--skip-xml", action="store_true", help="Skip converting Fixtures JSON to XML.")
     args = p.parse_args()
 
     run_sushi(skip=args.skip_sushi, dry_run=args.dry_run)
@@ -406,6 +526,14 @@ def main():
 
     print(f"🚚 Moving generated resources to target (overwrite): {target_dir}")
     merge_move(resources_dir, target_dir, dry_run=args.dry_run)
+
+    # NEW: Convert Fixtures JSON → XML in the TARGET so copies land next to the moved files
+    if not args.skip_xml:
+        fixtures_target = target_dir / "Fixtures"
+        print(f"🔄 Converting Fixtures to XML in: {fixtures_target}")
+        convert_fixtures_to_xml(fixtures_target, dry_run=args.dry_run)
+    else:
+        print("⏭️  Skipping XML conversion (per --skip-xml).")
 
     print("🎉 Done." + (" (dry-run: no changes were made)" if args.dry_run else ""))
 
