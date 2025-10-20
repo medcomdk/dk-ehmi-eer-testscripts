@@ -1,6 +1,5 @@
 RuleSet: AEER2CrudEndpointTests(xmlOrJson)
 * insert Metadata(AEER2CrudEndpointTests-{xmlOrJson})
-// TODO: Since we aren't validating any resources do we even need this profile to be included?
 * insert EERMessagingEndpointEdeliveryProfile
 * insert OriginClient
 * insert DestinationServer
@@ -60,6 +59,8 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * name = "CreatedOrganizationId"
   * expression = "id"
   * sourceId = "CreatedOrganization"
+
+// TODO: insert the READ operation here similar as to what we have done in AEER1, and then also for AEER4.
 
 * test[+]
   * id = "CreateNewEndpoint"

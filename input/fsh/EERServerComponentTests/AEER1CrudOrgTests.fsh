@@ -1,6 +1,5 @@
 RuleSet: AEER1CrudOrgTests(xmlOrJson)
 * insert Metadata(AEER1CrudOrgTests-{xmlOrJson})
-// TODO: Since we aren't validating any resources do we even need this profile to be included?
 * insert EERMessagingOrganizationProfile
 * insert OriginClient
 * insert DestinationServer
@@ -83,7 +82,7 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].assert
     * description = "Validate that the read created organization conforms to the EerMessagingOrganization profile."
     * direction = #response
-    * validateProfile = $EerMessagingOrganizationProfile
+    * validateProfileId = "eer-messaging-organization"
     * warningOnly = false
 
 * test[+]
@@ -133,7 +132,7 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].assert
     * description = "Validate that the read organization conforms to the EerMessagingOrganization profile."
     * direction = #response
-    * validateProfile = $EerMessagingOrganizationProfile
+    * validateProfileId = "eer-messaging-organization"
     * warningOnly = false
   * action[+].assert
     * description = "Validate that the read organization has the updated name."

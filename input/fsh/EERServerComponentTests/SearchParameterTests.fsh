@@ -1,0 +1,1 @@
+// TODO: We have created a messageType search parameter, so we should also try to use it
