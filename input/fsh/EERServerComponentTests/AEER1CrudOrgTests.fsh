@@ -1,32 +1,33 @@
 RuleSet: AEER1CrudOrgTests(xmlOrJson)
 * insert Metadata(AEER1CrudOrgTests-{xmlOrJson})
+// TODO: Since we aren't validating any resources do we even need this profile to be included?
 * insert EERMessagingOrganizationProfile
 * insert OriginClient
 * insert DestinationServer
 
-* fixture[0]
-  * id = "AEER1OrgCreate"
+* fixture[+]
+  * id = "OrgCreate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/Organization-AEER1OrgCreateFixture.{xmlOrJson})
+  * resource = Reference(./Fixtures/OrgCreateFixture.{xmlOrJson})
 
 * fixture[+]
-  * id = "AEER1OrgUpdate"
+  * id = "OrgUpdate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/Organization-AEER1OrgUpdateFixture.{xmlOrJson})
+  * resource = Reference(./Fixtures/OrgUpdateFixture.{xmlOrJson})
 
-* variable[0]
-  * name = "AEER1OrgCreateParamIdentifier"
+* variable[+]
+  * name = "OrgCreateParamIdentifier"
   * expression = "identifier[0].value"
-  * sourceId = "AEER1OrgCreate"
+  * sourceId = "OrgCreate"
 
 * setup
-  * action[0].operation
+  * action[+].operation
     * type = $testscript-operation-codes#delete
     * resource = #Organization
     * description = "Delete operation to ensure the Organization does not exist on the server."
-    * params = "?identifier=${AEER1OrgCreateParamIdentifier}"
+    * params = "?identifier=${OrgCreateParamIdentifier}"
     * encodeRequestUrl = true
     * accept = #{xmlOrJson}
   * action[+].assert
@@ -35,11 +36,11 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
     * responseCode = "200,204,404"
     * warningOnly = false
 
-* test[0]
+* test[+]
   * id = "CreateNewOrganization"
   * name = "CreateNewOrganization"
   * description = "Create a new EERMessagingOrganization."
-  * action[0].operation
+  * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Organization create operation."
     * contentType = #{xmlOrJson}
@@ -47,7 +48,7 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
     * destination = 1
     * encodeRequestUrl = true
     * origin = 1
-    * sourceId = "AEER1OrgCreate"
+    * sourceId = "OrgCreate"
     * responseId = "CreatedOrganization"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 201(Created)."
@@ -61,10 +62,35 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * sourceId = "CreatedOrganization"
 
 * test[+]
+  * id = "ReadOrganization"
+  * name = "ReadOrganization"
+  * description = "Read the created EERMessagingOrganization. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Organization read operation."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Organization
+    * params = "/${CreatedOrganizationId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read created organization conforms to the EerMessagingOrganization profile."
+    * direction = #response
+    * validateProfile = $EerMessagingOrganizationProfile
+    * warningOnly = false
+
+* test[+]
   * id = "UpdateOrganization"
   * name = "UpdateOrganization"
   * description = "Update an existing EERMessagingOrganization."
-  * action[0].operation
+  * action[+].operation
     * type = $testscript-operation-codes#update
     * description = "Organization update operation."
     * contentType = #{xmlOrJson}
@@ -73,18 +99,55 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
     * encodeRequestUrl = true
     * origin = 1
     * params = "/${CreatedOrganizationId}"
-    * sourceId = "AEER1OrgUpdate"
+    * sourceId = "OrgUpdate"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
     * direction = #response
     * response = #okay
     * warningOnly = false
 
+* variable[+]
+  * name = "UpdatedOrganizationName"
+  * expression = "name"
+  * sourceId = "OrgUpdate"
+
+* test[+]
+  * id = "ReadOrganizationAfterUpdate"
+  * name = "ReadOrganizationAfterUpdate"
+  * description = "Read the updated EERMessagingOrganization"
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Organization read operation."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Organization
+    * params = "/${CreatedOrganizationId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read organization conforms to the EerMessagingOrganization profile."
+    * direction = #response
+    * validateProfile = $EerMessagingOrganizationProfile
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read organization has the updated name."
+    * direction = #response
+    * expression = "name"
+    * operator = #equals
+    * value = "${UpdatedOrganizationName}"
+    * warningOnly = false
+
 * test[+]
   * id = "DeleteOrganization"
   * name = "DeleteOrganization"
   * description = "Delete an existing EERMessagingOrganization."
-  * action[0].operation
+  * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Organization delete operation."
     * contentType = #{xmlOrJson}
@@ -99,6 +162,26 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
     * response = #okay
     * warningOnly = false
 
+* test[+]
+  * id = "ReadOrganizationAfterDeletion"
+  * name = "ReadOrganizationAfterDeletion"
+  * description = "Try to read the deleted EERMessagingOrganization"
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Organization read operation after deletion."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Organization
+    * params = "/${CreatedOrganizationId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 404(Not Found)."
+    * direction = #response
+    * response = #notFound
+    * warningOnly = false
+
 Instance: AEER1CrudOrgTestsJson
 InstanceOf: TestScript
 Title: "Test for AEER.1 - CRUD operations on Organization JSON format"
@@ -111,16 +194,18 @@ Title: "Test for AEER.1 - CRUD operations on Organization XML format"
 Description: "This test script performs CRUD operations on the Organization resource to validate compliance with AEER.1 requirements. XML format."
 * insert AEER1CrudOrgTests(xml)
 
-Instance: AEER1OrgCreateFixture
+Instance: OrgCreateFixture
 InstanceOf: EerMessagingOrganization
+* insert OverrideGeneratedFileNameHelper(OrgCreateFixture)
 * name = "Lægerne Stjernepladsen I/S"
 * identifier[SOR-ID].system = "urn:oid:1.2.208.176.1.1"
 * identifier[SOR-ID].value = "543210987654321"
 * type[SOR-Hierarchy].coding = $EerSorOrganizationTypeCS#IO
 
-Instance: AEER1OrgUpdateFixture
+Instance: OrgUpdateFixture
 InstanceOf: EerMessagingOrganization
-* insert IdWithoutAffectingGeneratedFileName(CreatedOrganizationId, Organization-AEER1OrgUpdateFixture)
+* insert IdTouchstoneVariable(CreatedOrganizationId)
+* insert OverrideGeneratedFileNameHelper(OrgUpdateFixture)
 * name = "Updated Name - Lægerne Stjernepladsen I/S"
 * identifier[SOR-ID].system = "urn:oid:1.2.208.176.1.1"
 * identifier[SOR-ID].value = "543210987654321"
