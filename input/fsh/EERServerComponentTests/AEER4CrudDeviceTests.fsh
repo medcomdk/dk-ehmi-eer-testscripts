@@ -1,9 +1,6 @@
 RuleSet: AEER4CrudDeviceTests(xmlOrJson)
 * insert Metadata(AEER4CrudDeviceTests-{xmlOrJson})
-// TODO: Check if we even need these profiles since we aren't validating any resources?
 * insert EERMessagingDeviceAPProfile
-* insert EERMessagingDeviceEUAProfile
-* insert EERMessagingDeviceMSHProfile
 * insert OriginClient
 * insert DestinationServer
 
@@ -43,6 +40,7 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
     * operator = #in
     * responseCode = "200,204,404"
     * warningOnly = false
+
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "DeviceDefinition create operation."
@@ -89,6 +87,31 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * sourceId = "CreatedDevice"
 
 * test[+]
+  * id = "ReadDevice"
+  * name = "ReadDevice"
+  * description = "Read the created EERDevice. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Device read operation."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Device
+    * params = "/${CreatedDeviceId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read created endpoint conforms to the EERMessagingDeviceAP profile."
+    * direction = #response
+    * validateProfileId = "eer-messaging-device-ap"
+    * warningOnly = false
+
+* test[+]
   * id = "UpdateDevice"
   * name = "UpdateDevice"
   * description = "Update an existing EerDevice."
@@ -108,6 +131,43 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
     * response = #okay
     * warningOnly = false
 
+* variable[+]
+  * name = "UpdatedDeviceName"
+  * expression = "deviceName.name"
+  * sourceId = "DeviceUpdateFixture"
+
+* test[+]
+  * id = "ReadDeviceAfterUpdate"
+  * name = "ReadDeviceAfterUpdate"
+  * description = "Read the created EERDevice after update. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Device read operation after update."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Device
+    * params = "/${CreatedDeviceId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read created endpoint conforms to the EERMessagingDeviceAP profile."
+    * direction = #response
+    * validateProfileId = "eer-messaging-device-ap"
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the updated device name is updated."
+    * direction = #response
+    * expression = "deviceName.name"
+    * operator = #equals
+    * value = "${UpdatedDeviceName}"
+    * warningOnly = false
+
 * test[+]
   * id = "DeleteDevice"
   * name = "DeleteDevice"
@@ -125,6 +185,26 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
     * description = "Confirm that the returned HTTP status is 200(Ok)."
     * direction = #response
     * response = #okay
+    * warningOnly = false
+
+* test[+]
+  * id = "ReadDeviceAfterDelete"
+  * name = "ReadDeviceAfterDelete"
+  * description = "Read the created EERDevice after delete. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Device read operation after delete."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Device
+    * params = "/${CreatedDeviceId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 404(Not Found)."
+    * direction = #response
+    * response = #notFound
     * warningOnly = false
 
 Instance: AEER4CrudDeviceTestsJson
@@ -164,6 +244,6 @@ InstanceOf: EerDeviceAP
 * identifier.value = "UpdateEerDeviceAP-TouchstoneTestAP"
 * definition = "DeviceDefinition/TouchstoneHelper-DS-CBS-CreatedDeviceDefinitionId-CBE"
 * status = #active
-* deviceName.name = "TestAPDevice"
+* deviceName.name = "Updated TestAPDevice"
 * deviceName.type = #manufacturer-name
 * manufacturer = "TouchStoneTest"

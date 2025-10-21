@@ -60,8 +60,6 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * expression = "id"
   * sourceId = "CreatedOrganization"
 
-// TODO: insert the READ operation here similar as to what we have done in AEER1, and then also for AEER4.
-
 * test[+]
   * id = "CreateNewEndpoint"
   * name = "CreateNewEndpoint"
@@ -88,6 +86,31 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * sourceId = "CreatedEndpoint"
 
 * test[+]
+  * id = "ReadEndpoint"
+  * name = "ReadEndpoint"
+  * description = "Read the created EERMessagingEndpoint. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Endpoint read operation."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Endpoint
+    * params = "/${CreatedEndpointId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read created endpoint conforms to the EerMessagingEndpointEDelivery profile."
+    * direction = #response
+    * validateProfileId = "eer-messaging-endpoint-edelivery"
+    * warningOnly = false
+
+* test[+]
   * id = "UpdateEndpoint"
   * name = "UpdateEndpoint"
   * description = "Update an existing EerEndpointMessagingEdeliveryFhir."
@@ -107,6 +130,43 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
     * response = #okay
     * warningOnly = false
 
+* variable[+]
+  * name = "UpdatedEndpointStatus"
+  * expression = "status"
+  * sourceId = "EndpointUpdate"
+
+* test[+]
+  * id = "ReadEndpointAfterUpdate"
+  * name = "ReadEndpointAfterUpdate"
+  * description = "Read the updated EERMessagingEndpoint. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Endpoint read operation after update."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Endpoint
+    * params = "/${CreatedEndpointId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 200(OK)."
+    * direction = #response
+    * response = #okay
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the read created endpoint conforms to the EerMessagingEndpointEDelivery profile."
+    * direction = #response
+    * validateProfileId = "eer-messaging-endpoint-edelivery"
+    * warningOnly = false
+  * action[+].assert
+    * description = "Validate that the updated status is as expected after update."
+    * direction = #response
+    * expression = "status"
+    * operator = #equals
+    * value = "${UpdatedEndpointStatus}"
+    * warningOnly = false
+
 * test[+]
   * id = "DeleteEndpoint"
   * name = "DeleteEndpoint"
@@ -124,6 +184,26 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
     * description = "Confirm that the returned HTTP status is 200(Ok)."
     * direction = #response
     * response = #okay
+    * warningOnly = false
+
+* test[+]
+  * id = "ReadEndpointAfterDelete"
+  * name = "ReadEndpointAfterDelete"
+  * description = "Read the deleted EERMessagingEndpoint. To ensure AFSS.5 and AFSS.6 is possible."
+  * action[+].operation
+    * type = $testscript-operation-codes#read
+    * description = "Endpoint read operation after delete."
+    * contentType = #{xmlOrJson}
+    * accept = #{xmlOrJson}
+    * destination = 1
+    * encodeRequestUrl = true
+    * origin = 1
+    * resource = #Endpoint
+    * params = "/${CreatedEndpointId}"
+  * action[+].assert
+    * description = "Confirm that the returned HTTP status is 404(Not Found)."
+    * direction = #response
+    * response = #notFound
     * warningOnly = false
 
 Instance: AEER2CrudEndpointTestsJson
