@@ -21,14 +21,17 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * expression = "identifier[0].value"
   * sourceId = "OrgCreate"
 
-* setup
+* setup[+]
   * action[+].operation
     * type = $testscript-operation-codes#delete
-    * resource = #Organization
     * description = "Delete operation to ensure the Organization does not exist on the server."
-    * params = "?identifier=${OrgCreateParamIdentifier}"
+    * resource = #Organization
     * encodeRequestUrl = true
+    * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
     * accept = #{xmlOrJson}
+    * params = "?identifier=${OrgCreateParamIdentifier}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is either 200(OK), 204(No Content) or 404(Not Found)."
     * operator = #in
@@ -42,11 +45,11 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Organization create operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * sourceId = "OrgCreate"
     * responseId = "CreatedOrganization"
   * action[+].assert
@@ -67,12 +70,12 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Organization read operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Organization
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Organization
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedOrganizationId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -92,11 +95,11 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#update
     * description = "Organization update operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedOrganizationId}"
     * sourceId = "OrgUpdate"
   * action[+].assert
@@ -117,12 +120,12 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Organization read operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Organization
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Organization
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedOrganizationId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -149,11 +152,11 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Organization delete operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedOrganizationId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(Ok)."
@@ -168,11 +171,11 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Organization read operation after deletion."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * resource = #Organization
     * params = "/${CreatedOrganizationId}"
   * action[+].assert

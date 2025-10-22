@@ -27,14 +27,17 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * expression = "identifier[0].value"
   * sourceId = "DeviceCreateFixture"
 
-* setup
+* setup[+]
   * action[+].operation
     * type = $testscript-operation-codes#delete
-    * resource = #Endpoint
     * description = "Delete operation to ensure the Device does not exist on the server."
-    * params = "?identifier=${DeviceCreateParamIdentifier}"
+    * resource = #Endpoint
     * encodeRequestUrl = true
+    * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
     * accept = #{xmlOrJson}
+    * params = "?identifier=${DeviceCreateParamIdentifier}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is either 200(OK), 204(No Content) or 404(Not Found)."
     * operator = #in
@@ -44,11 +47,11 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "DeviceDefinition create operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * sourceId = "DeviceDefinitionCreateFixture"
     * responseId = "CreatedDeviceDefinition"
   * action[+].assert
@@ -68,11 +71,11 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Device create operation"
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * sourceId = "DeviceCreateFixture"
     * responseId = "CreatedDevice"
   * action[+].assert
@@ -93,12 +96,12 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Device read operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Device
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Device
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedDeviceId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -118,11 +121,11 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#update
     * description = "Device update operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedDeviceId}"
     * sourceId = "DeviceUpdateFixture"
   * action[+].assert
@@ -143,12 +146,12 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Device read operation after update."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Device
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Device
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedDeviceId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -175,11 +178,11 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Device delete operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedDeviceId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(Ok)."
@@ -194,12 +197,12 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Device read operation after delete."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Device
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Device
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedDeviceId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 404(Not Found)."

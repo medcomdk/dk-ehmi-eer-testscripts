@@ -27,14 +27,17 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * expression = "identifier[0].value"
   * sourceId = "EndpointCreate"
 
-* setup
+* setup[+]
   * action[+].operation
     * type = $testscript-operation-codes#delete
-    * resource = #Endpoint
     * description = "Delete operation to ensure the Endpoint does not exist on the server."
-    * params = "?identifier=${EndpointCreateParamIdentifier}"
+    * resource = #Endpoint
     * encodeRequestUrl = true
+    * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
     * accept = #{xmlOrJson}
+    * params = "?identifier=${EndpointCreateParamIdentifier}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is either 200(OK), 204(No Content) or 404(Not Found)."
     * operator = #in
@@ -43,11 +46,11 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Organization create operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * sourceId = "OrgCreate"
     * responseId = "CreatedOrganization"
   * action[+].assert
@@ -67,11 +70,11 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Endpoint create operation"
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * sourceId = "EndpointCreate"
     * responseId = "CreatedEndpoint"
   * action[+].assert
@@ -92,12 +95,12 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Endpoint read operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Endpoint
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedEndpointId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -117,11 +120,11 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#update
     * description = "Endpoint update operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedEndpointId}"
     * sourceId = "EndpointUpdate"
   * action[+].assert
@@ -142,12 +145,12 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Endpoint read operation after update."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Endpoint
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedEndpointId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(OK)."
@@ -174,11 +177,11 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Endpoint delete operation."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
     * encodeRequestUrl = true
     * origin = 1
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedEndpointId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 200(Ok)."
@@ -193,12 +196,12 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#read
     * description = "Endpoint read operation after delete."
-    * contentType = #{xmlOrJson}
-    * accept = #{xmlOrJson}
-    * destination = 1
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
-    * resource = #Endpoint
+    * contentType = #{xmlOrJson}
+    * destination = 1
+    * accept = #{xmlOrJson}
     * params = "/${CreatedEndpointId}"
   * action[+].assert
     * description = "Confirm that the returned HTTP status is 404(Not Found)."
