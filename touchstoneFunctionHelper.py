@@ -136,12 +136,10 @@ def _remove_filename_override_tag(parsed_json: dict) -> bool:
     if new_tags:
         meta["tag"] = new_tags
     else:
-        # If the tag array is now empty, drop it entirely
         try:
             del meta["tag"]
         except Exception:
             pass
-        # If meta becomes empty, you could optionally remove meta too.
         if not meta:
             try:
                 del parsed_json["meta"]
@@ -186,7 +184,6 @@ def process_file(fp: Path, dry_run: bool, backup: bool) -> dict | None:
         override = _extract_filename_override(parsed)
         if override:
             sanitized = _sanitize_filename(override)
-            # Preserve original extension
             new_name = f"{sanitized}{fp.suffix or '.json'}"
             if fp.name != new_name:
                 rename_from = fp.name
@@ -195,17 +192,13 @@ def process_file(fp: Path, dry_run: bool, backup: bool) -> dict | None:
         # 2) Remove the override tag from the JSON
         removed_override_tag = _remove_filename_override_tag(parsed)
         if removed_override_tag:
-            # Re-serialize with pretty formatting
             updated_text = json.dumps(parsed, ensure_ascii=False, indent=2)
             if not updated_text.endswith("\n"):
                 updated_text += "\n"
 
     except Exception:
-        # If parsing fails, we still proceed with text replacements,
-        # but cannot rename by meta tag or remove it.
         pass
 
-    # Only write if there are changes (content or rename)
     content_changed = (updated_text != text)
     if content_changed or rename_to:
         if not dry_run:
@@ -213,17 +206,14 @@ def process_file(fp: Path, dry_run: bool, backup: bool) -> dict | None:
                 if backup and content_changed:
                     bak = fp.with_suffix(fp.suffix + ".bak")
                     bak.write_text(text, encoding="utf-8")
-                # Write updated content if changed
                 if content_changed:
                     fp.write_text(updated_text, encoding="utf-8")
-                # Perform rename if needed
                 if rename_to:
                     target = fp.with_name(rename_to)
-                    # If destination exists, overwrite it for determinism
                     if target.exists():
                         target.unlink()
                     fp.rename(target)
-                    fp = target  # update fp so later steps would see the new name if returned
+                    fp = target
             except Exception as e:
                 print(f"❌ Failed to update/rename {fp}: {e}")
                 return None
@@ -259,8 +249,6 @@ def bulk_replace(root: Path, recursive: bool, dry_run: bool, backup: bool) -> in
 
         if pairs or rename_to or removed_override_tag:
             total_files_changed += 1
-
-            # Per-file aggregation (unique pair -> count)
             file_counter = Counter(pairs)
             overall_counter.update(file_counter)
 
@@ -328,10 +316,28 @@ def move_fixture_jsons(resources_dir: Path, dry_run: bool) -> None:
     print(f"📦 Fixture JSONs moved: {moved}" + (" (dry-run)" if dry_run else ""))
 
 
+def _tests_subdir_for(name: str) -> str | None:
+    """
+    Decide which tests subfolder (if any) a file should go into 
+    based on its filename prefix.
+    """
+    if name.startswith("TestScript-InternalServer"):
+        return "InternalServerTests"
+    if name.startswith("TestScript-Server"):
+        return "ServerTests"
+    if name.startswith("TestScript-Client"):
+        return "ClientTests"
+    return None
+
 def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
     """
     Move files/dirs from src into dst, overwriting/merging as needed.
     Skips anything whose name starts with 'ImplementationGuide'.
+
+    Additionally, when placing files into dst:
+      - Names starting with 'InternalServer' go into 'InternalServerTests'
+      - Names starting with 'Server' go into 'ServerTests'
+      - Names starting with 'Client' go into 'ClientTests'
     """
     if dry_run:
         print(f"🧪 Would ensure target directory exists: {dst}")
@@ -344,8 +350,15 @@ def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
             print(f"⤴️  Skipping (per rule): {item}")
             continue
 
+        # Default target in dst
         target = dst / name
+
         if item.is_file():
+            # Decide if this file belongs in one of the tests subfolders
+            subdir = _tests_subdir_for(name)
+            if subdir:
+                target = dst / subdir / name
+
             if dry_run:
                 print(f"🧪 Would move file: {item} -> {target} (overwrite if exists)")
             else:
@@ -356,6 +369,7 @@ def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
                     shutil.move(str(item), str(target))
                 except Exception as e:
                     print(f"❌ Failed to move file {item} -> {target}: {e}")
+
         elif item.is_dir():
             if dry_run:
                 print(f"🧪 Would merge/move directory: {item} -> {target} (overwrite contents)")
@@ -370,6 +384,69 @@ def merge_move(src: Path, dst: Path, dry_run: bool) -> None:
         else:
             print(f"⚠️  Skipping non-file: {item}")
 
+def _is_dangerous_root(path: Path) -> bool:
+    """Avoid catastrophic wipes like '/' or drive roots."""
+    try:
+        path = path.resolve()
+    except Exception:
+        return True
+    if os.name == "nt":
+        # e.g., 'C:\\' etc.
+        return path.parent == path  # root of drive
+    else:
+        return str(path) == "/"
+
+def wipe_target_dir(target: Path, source: Path, dry_run: bool) -> None:
+    """
+    Delete *all contents* of target directory before moving new files.
+    Safety checks:
+      - target exists or will be created.
+      - target is not the same as source.
+      - target is not inside source (to avoid deleting the build output).
+      - target is not a filesystem root.
+    """
+    target = target.resolve()
+    source = source.resolve()
+
+    # Safety checks
+    if _is_dangerous_root(target):
+        print(f"❌ Refusing to wipe dangerous path: {target}")
+        sys.exit(1)
+
+    if target == source:
+        print("❌ Refusing to wipe: --target is the same as --resources.")
+        sys.exit(1)
+
+    try:
+        if target in source.parents:
+            print("❌ Refusing to wipe: --target is inside --resources.")
+            sys.exit(1)
+    except Exception:
+        pass
+
+    if dry_run:
+        if target.exists():
+            print(f"🧪 Would erase ALL contents of: {target}")
+            for entry in sorted(target.iterdir()):
+                print(f"   • Would delete: {entry}")
+        else:
+            print(f"🧪 Would create target directory: {target}")
+        return
+
+    # Create target if missing
+    target.mkdir(parents=True, exist_ok=True)
+
+    # Delete everything inside target
+    for entry in target.iterdir():
+        try:
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
+        except Exception as e:
+            print(f"❌ Failed to delete {entry}: {e}")
+    print(f"🧹 Wiped target directory: {target}")
+
 # ---------------------------
 # FHIR JSON → XML conversion
 # ---------------------------
@@ -380,11 +457,9 @@ _PRIMITIVE_TYPES = {
 }
 
 def _is_primitive_element(name: str, value: Any) -> bool:
-    # Heuristic: FHIR primitive elements are leaf values (str/int/float/bool or {"value":...})
     return isinstance(value, (str, int, float, bool)) or (isinstance(value, dict) and "value" in value)
 
 def _set_primitive(el: ET.Element, value: Any) -> None:
-    # In FHIR XML, primitive value goes in @value
     if isinstance(value, dict) and "value" in value and len(value) == 1:
         val = value["value"]
     else:
@@ -395,7 +470,6 @@ def _append_child(parent: ET.Element, name: str) -> ET.Element:
     return ET.SubElement(parent, f"{{{FHIR_NS}}}{name}")
 
 def _serialize_element(parent: ET.Element, name: str, value: Any) -> None:
-    # Arrays -> repeated elements
     if isinstance(value, list):
         for item in value:
             _serialize_element(parent, name, item)
@@ -403,34 +477,27 @@ def _serialize_element(parent: ET.Element, name: str, value: Any) -> None:
 
     el = _append_child(parent, name)
 
-    # Primitive leaf?
     if _is_primitive_element(name, value):
         _set_primitive(el, value if not isinstance(value, dict) else value.get("value"))
         return
 
-    # Complex object
     if isinstance(value, dict):
         for k, v in value.items():
             if v is None:
                 continue
-            # Special case: Narrative.text.div is XHTML that should be embedded as XML, not string
             if name == "text" and k == "div" and isinstance(v, str) and v.strip().startswith("<"):
                 try:
-                    # Parse XHTML fragment and graft with xhtml ns
                     div_el = ET.fromstring(v)
-                    # Ensure namespace is XHTML
                     if not div_el.tag.startswith("{"):
                         div_el.tag = f"{{{XHTML_NS}}}{div_el.tag}"
                     el.append(div_el)
                 except Exception:
-                    # If parsing fails, fall back to a literal child with value attr
                     div = _append_child(el, "div")
                     div.set("value", v)
                 continue
             _serialize_element(el, k, v)
         return
 
-    # Otherwise (shouldn't happen often), coerce to primitive
     _set_primitive(el, value)
 
 def json_resource_to_xml_tree(obj: dict) -> ET.ElementTree:
@@ -446,16 +513,11 @@ def json_resource_to_xml_tree(obj: dict) -> ET.ElementTree:
 
 def write_pretty_xml(tree: ET.ElementTree, out_path: Path) -> None:
     rough = ET.tostring(tree.getroot(), encoding="utf-8", xml_declaration=True)
-    # Pretty print without changing content
     parsed = minidom.parseString(rough)
     with out_path.open("wb") as f:
         f.write(parsed.toprettyxml(indent="  ", encoding="utf-8"))
 
 def convert_fixtures_to_xml(fixtures_dir: Path, dry_run: bool) -> int:
-    """
-    For each *.json in fixtures_dir, write a sibling *.xml with equivalent FHIR XML.
-    Returns count of XML files written.
-    """
     if not fixtures_dir.exists():
         print(f"ℹ️  Fixtures directory not found (skipping XML conversion): {fixtures_dir}")
         return 0
@@ -482,7 +544,7 @@ def convert_fixtures_to_xml(fixtures_dir: Path, dry_run: bool) -> int:
 
 def main():
     p = argparse.ArgumentParser(
-        description="Run sushi, apply wildcard replacements, rename by TouchstoneHelperFileNameOverride, remove its meta.tag entry, organize Fixtures, move resources, and convert Fixtures to XML."
+        description="Run sushi, apply wildcard replacements, rename by TouchstoneHelperFileNameOverride, remove its meta.tag entry, organize Fixtures, WIPE TARGET, move resources, and convert Fixtures to XML."
     )
     p.add_argument(
         "--resources",
@@ -492,8 +554,7 @@ def main():
     p.add_argument(
         "--target",
         default=DEFAULT_TARGET_STR,
-        help=r"Destination folder to receive generated resources "
-             r'(default: C:\Users\OLW\workspace-ts-ide\FHIRSandbox\EHMIEndpointRegistry)',
+        help="Destination folder to receive generated resources (will be wiped first).",
     )
     p.add_argument(
         "--non-recursive",
@@ -524,10 +585,14 @@ def main():
     print("🗂️  Organizing Fixture JSONs...")
     move_fixture_jsons(resources_dir, dry_run=args.dry_run)
 
-    print(f"🚚 Moving generated resources to target (overwrite): {target_dir}")
+    # *** NEW: wipe the target completely ***
+    print(f"🧨 Wiping target directory before move: {target_dir}")
+    wipe_target_dir(target_dir, resources_dir, dry_run=args.dry_run)
+
+    print(f"🚚 Moving generated resources to target: {target_dir}")
     merge_move(resources_dir, target_dir, dry_run=args.dry_run)
 
-    # NEW: Convert Fixtures JSON → XML in the TARGET so copies land next to the moved files
+    # Convert Fixtures JSON → XML in the TARGET so copies land next to the moved files
     if not args.skip_xml:
         fixtures_target = target_dir / "Fixtures"
         print(f"🔄 Converting Fixtures to XML in: {fixtures_target}")

@@ -1,5 +1,5 @@
-RuleSet: AEER2CrudEndpointTests(xmlOrJson)
-* insert Metadata(AEER2CrudEndpointTests-{xmlOrJson})
+RuleSet: Server-AEER2CrudEndpointTests(xmlOrJson)
+* insert Metadata(Server-AEER2CrudEndpointTests-{xmlOrJson})
 * insert EERMessagingEndpointEdeliveryProfile
 * insert OriginClient
 * insert DestinationServer
@@ -8,19 +8,19 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * id = "OrgCreate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/OrgCreateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/OrgCreateFixture.{xmlOrJson}"
 
 * fixture[+]
   * id = "EndpointCreate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/EndpointCreateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/EndpointCreateFixture.{xmlOrJson}"
 
 * fixture[+]
   * id = "EndpointUpdate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/EndpointUpdateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/EndpointUpdateFixture.{xmlOrJson}"
 
 * variable[+]
   * name = "EndpointCreateParamIdentifier"
@@ -46,6 +46,7 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Organization create operation."
+    * resource = #Organization
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -70,6 +71,7 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Endpoint create operation"
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -120,6 +122,7 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#update
     * description = "Endpoint update operation."
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -173,10 +176,11 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
 * test[+]
   * id = "DeleteEndpoint"
   * name = "DeleteEndpoint"
-  * description = "Delete an existing EerEndpointMessagingEdeliveryFhir."
+  * description = "Delete an existing EerEndpointMessaging."
   * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Endpoint delete operation."
+    * resource = #Endpoint
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -209,20 +213,20 @@ RuleSet: AEER2CrudEndpointTests(xmlOrJson)
     * response = #notFound
     * warningOnly = false
 
-Instance: AEER2CrudEndpointTestsJson
+Instance: Server-AEER2CrudEndpointTestsJson
 InstanceOf: TestScript
 Title: "Test for AEER.2 - CRUD operations on Endpoint JSON format"
 Description: "This test script performs CRUD operations on the Endpoint resource to validate compliance with AEER.2 requirements. JSON format."
-* insert AEER2CrudEndpointTests(json)
+* insert Server-AEER2CrudEndpointTests(json)
 
-Instance: AEER2CrudEndpointTestsXml
+Instance: Server-AEER2CrudEndpointTestsXml
 InstanceOf: TestScript
 Title: "Test for AEER.2 - CRUD operations on Endpoint XML format"
 Description: "This test script performs CRUD operations on the Endpoint resource to validate compliance with AEER.2 requirements. XML format."
-* insert AEER2CrudEndpointTests(xml)
+* insert Server-AEER2CrudEndpointTests(xml)
 
 Instance: EndpointCreateFixture
-InstanceOf: EerEndpointMessagingEdeliveryFhir
+InstanceOf: EerEndpointMessaging
 * insert OverrideGeneratedFileNameHelper(EndpointCreateFixture)
 * identifier.value = "SomeTestGLNNumber"
 * status = #test
@@ -233,9 +237,10 @@ InstanceOf: EerEndpointMessagingEdeliveryFhir
 * payloadType[+] = $EhmiMessageDefinitionUri#urn:dk:healthcare:medcom:messaging:fhir:structuredefinition:homecareobservation:1.1
 * payloadMimeType[+] = #application/fhir+json
 * address = "http://www.test.test/test"
+* connectionType = $EEREndpointConnectionTypeCS#EerMessagingEdeliveryFhir
 
 Instance: EndpointUpdateFixture
-InstanceOf: EerEndpointMessagingEdeliveryFhir
+InstanceOf: EerEndpointMessaging
 * insert IdTouchstoneVariable(CreatedEndpointId)
 * insert OverrideGeneratedFileNameHelper(EndpointUpdateFixture)
 * identifier.value = "SomeTestGLNNumber"
@@ -247,3 +252,4 @@ InstanceOf: EerEndpointMessagingEdeliveryFhir
 * payloadType[+] = $EhmiMessageDefinitionUri#urn:dk:healthcare:medcom:messaging:fhir:structuredefinition:homecareobservation:1.1
 * payloadMimeType[+] = #application/fhir+json
 * address = "http://www.test.test/test"
+* connectionType = $EEREndpointConnectionTypeCS#EerMessagingEdeliveryFhir

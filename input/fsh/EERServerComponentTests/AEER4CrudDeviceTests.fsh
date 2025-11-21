@@ -1,26 +1,20 @@
-RuleSet: AEER4CrudDeviceTests(xmlOrJson)
-* insert Metadata(AEER4CrudDeviceTests-{xmlOrJson})
+RuleSet: Server-AEER4CrudDeviceTests(xmlOrJson)
+* insert Metadata(Server-AEER4CrudDeviceTests-{xmlOrJson})
 * insert EERMessagingDeviceAPProfile
 * insert OriginClient
 * insert DestinationServer
 
 * fixture[+]
-  * id = "DeviceDefinitionCreateFixture"
-  * autocreate = false
-  * autodelete = false
-  * resource = Reference(./Fixtures/DeviceDefinitionCreateFixture.{xmlOrJson})
-
-* fixture[+]
   * id = "DeviceCreateFixture"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/DeviceCreateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/DeviceCreateFixture.{xmlOrJson}"
 
 * fixture[+]
   * id = "DeviceUpdateFixture"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/DeviceUpdateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/DeviceUpdateFixture.{xmlOrJson}"
 
 * variable[+]
   * name = "DeviceCreateParamIdentifier"
@@ -31,7 +25,7 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#delete
     * description = "Delete operation to ensure the Device does not exist on the server."
-    * resource = #Endpoint
+    * resource = #Device
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -44,26 +38,6 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
     * responseCode = "200,204,404"
     * warningOnly = false
 
-  * action[+].operation
-    * type = $testscript-operation-codes#create
-    * description = "DeviceDefinition create operation."
-    * encodeRequestUrl = true
-    * origin = 1
-    * contentType = #{xmlOrJson}
-    * destination = 1
-    * accept = #{xmlOrJson}
-    * sourceId = "DeviceDefinitionCreateFixture"
-    * responseId = "CreatedDeviceDefinition"
-  * action[+].assert
-    * description = "Confirm that the returned HTTP status is either 201(Created)"
-    * response = #created
-    * warningOnly = false
-
-* variable[+]
-    * name = "CreatedDeviceDefinitionId"
-    * expression = "id"
-    * sourceId = "CreatedDeviceDefinition"
-
 * test[+]
   * id = "CreateNewDevice"
   * name = "CreateNewDevice"
@@ -71,6 +45,7 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
   * action[+].operation
     * type = $testscript-operation-codes#create
     * description = "Device create operation"
+    * resource = #Device
     * encodeRequestUrl = true
     * origin = 1
     * contentType = #{xmlOrJson}
@@ -210,43 +185,36 @@ RuleSet: AEER4CrudDeviceTests(xmlOrJson)
     * response = #notFound
     * warningOnly = false
 
-Instance: AEER4CrudDeviceTestsJson
+
+Instance: Server-AEER4CrudDeviceTestsJson
 InstanceOf: TestScript
 Title: "Test for AEER.4 - CRUD operations on Device JSON format"
 Description: "This test script performs CRUD operations on the Device resource to validate compliance with AEER.4 requirements. JSON format."
-* insert AEER4CrudDeviceTests(json)
+* insert Server-AEER4CrudDeviceTests(json)
 
-Instance: AEER2CrudDeviceTestsXml
+Instance: Server-AEER4CrudDeviceTestsXml
 InstanceOf: TestScript
 Title: "Test for AEER.4 - CRUD operations on Device XML format"
 Description: "This test script performs CRUD operations on the Device resource to validate compliance with AEER.4 requirements. XML format."
-* insert AEER2CrudEndpointTests(xml)
-
-// TODO: Talk with Ole about deleting the EERDeviceDefinition and deleting the AP, EUA, MSH Device StructureDefinition and just use the type element instead
-Instance: DeviceDefinitionCreateFixture
-InstanceOf: DeviceDefinition
-* insert OverrideGeneratedFileNameHelper(DeviceDefinitionCreateFixture)
-* deviceName
-    * name = "TestDevice"
-    * type = #user-friendly-name
+* insert Server-AEER4CrudDeviceTests(xml)
 
 Instance: DeviceCreateFixture
-InstanceOf: EerDeviceAP
+InstanceOf: EerDevice
 * insert OverrideGeneratedFileNameHelper(DeviceCreateFixture)
 * identifier.value = "CreateEerDeviceAP-TouchstoneTestAP"
-* definition = "DeviceDefinition/TouchstoneHelper-DS-CBS-CreatedDeviceDefinitionId-CBE"
 * status = #active
 * deviceName.name = "TestAPDevice"
 * deviceName.type = #manufacturer-name
 * manufacturer = "TouchStoneTest"
+* type = $EERDeviceTypeCS#AP
 
 Instance: DeviceUpdateFixture
-InstanceOf: EerDeviceAP
+InstanceOf: EerDevice
 * insert IdTouchstoneVariable(CreatedDeviceId)
 * insert OverrideGeneratedFileNameHelper(DeviceUpdateFixture)
 * identifier.value = "UpdateEerDeviceAP-TouchstoneTestAP"
-* definition = "DeviceDefinition/TouchstoneHelper-DS-CBS-CreatedDeviceDefinitionId-CBE"
 * status = #active
 * deviceName.name = "Updated TestAPDevice"
 * deviceName.type = #manufacturer-name
 * manufacturer = "TouchStoneTest"
+* type = $EERDeviceTypeCS#AP

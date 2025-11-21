@@ -1,5 +1,5 @@
-RuleSet: AEER1CrudOrgTests(xmlOrJson)
-* insert Metadata(AEER1CrudOrgTests-{xmlOrJson})
+RuleSet: Server-AEER1CrudOrgTests(xmlOrJson)
+* insert Metadata(Server-AEER1CrudOrgTests-{xmlOrJson})
 * insert EERMessagingOrganizationProfile
 * insert OriginClient
 * insert DestinationServer
@@ -8,13 +8,13 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
   * id = "OrgCreate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/OrgCreateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/OrgCreateFixture.{xmlOrJson}"
 
 * fixture[+]
   * id = "OrgUpdate"
   * autocreate = false
   * autodelete = false
-  * resource = Reference(./Fixtures/OrgUpdateFixture.{xmlOrJson})
+  * resource.reference = "../Fixtures/OrgUpdateFixture.{xmlOrJson}"
 
 * variable[+]
   * name = "OrgCreateParamIdentifier"
@@ -184,17 +184,17 @@ RuleSet: AEER1CrudOrgTests(xmlOrJson)
     * response = #notFound
     * warningOnly = false
 
-Instance: AEER1CrudOrgTestsJson
+Instance: Server-AEER1CrudOrgTestsJson
 InstanceOf: TestScript
 Title: "Test for AEER.1 - CRUD operations on Organization JSON format"
 Description: "This test script performs CRUD operations on the Organization resource to validate compliance with AEER.1 requirements. JSON format."
-* insert AEER1CrudOrgTests(json)
+* insert Server-AEER1CrudOrgTests(json)
 
-Instance: AEER1CrudOrgTestsXml
+Instance: Server-AEER1CrudOrgTestsXml
 InstanceOf: TestScript
 Title: "Test for AEER.1 - CRUD operations on Organization XML format"
 Description: "This test script performs CRUD operations on the Organization resource to validate compliance with AEER.1 requirements. XML format."
-* insert AEER1CrudOrgTests(xml)
+* insert Server-AEER1CrudOrgTests(xml)
 
 Instance: OrgCreateFixture
 InstanceOf: EerMessagingOrganization
